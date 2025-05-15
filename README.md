@@ -1,27 +1,20 @@
-# Run an MCP Server on Vercel
+# Unofficial Jina Reader MCP Server on Vercel
 
-## Usage
+This project provides an **unofficial** wrapper for the [Jina Reader API](https://jina.ai/reader/) using the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). It allows Language Models (LLMs) and other MCP-compatible clients to easily fetch, read, and process content from any URL in an LLM-friendly format, leveraging Jina Reader's capabilities.
 
-Update `api/server.ts` with your tools, prompts, and resources following the [MCP TypeScript SDK documentation](https://github.com/modelcontextprotocol/typescript-sdk/tree/main?tab=readme-ov-file#server).
+## Key Features
 
-[There is also a Next.js version of this template](https://vercel.com/templates/next.js/model-context-protocol-mcp-with-next-js)
+This server primarily exposes the `fetch_url_content` tool, which allows you to:
+- Fetch content from a given URL.
+- Optionally provide a Jina Reader API key for higher rate limits.
+- Control various aspects of the fetching and parsing process through parameters that map to Jina Reader API headers, such as:
+  - Image alt text generation (`X-With-Generated-Alt`)
+  - Cookie forwarding (`X-Set-Cookie`)
+  - Output formats (markdown, html, text, screenshot URL via `X-Respond-With`)
+  - Proxy usage (`X-Proxy-Url`)
+  - Caching behavior (`X-Cache-Tolerance`, `X-No-Cache`)
+  - CSS selectors for targeting or waiting for content (`X-Target-Selector`, `X-Wait-For-Selector`)
+  - Request timeout (`X-Timeout`)
+  - Requesting JSON output or using POST for the URL.
 
-## Notes for running on Vercel
-
-- Requires a Redis attached to the project under `process.env.REDIS_URL`
-- Make sure you have [Fluid compute](https://vercel.com/docs/functions/fluid-compute) enabled for efficient execution
-- After enabling Fluid compute, open `vercel.json` and adjust max duration to 800 if you using a Vercel Pro or Enterprise account
-- [Deploy the MCP template](https://vercel.com/templates/other/model-context-protocol-mcp-with-vercel-functions)
-
-## Local dev
-
-- Run `vercel dev` for local development
-- Alternatively, integrate the system into the server framework of your choice.
-
-## Sample Client
-
-`script/test-client.mjs` contains a sample client to try invocations.
-
-```sh
-node scripts/test-client.mjs https://mcp-on-vercel.vercel.app
-```
+**Disclaimer:** This is an unofficial project and is not affiliated with or endorsed by Jina AI.
