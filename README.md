@@ -1,5 +1,7 @@
 # Unofficial Jina Reader MCP Server on Vercel
 
+[rjina.vercel.app/mcp](https://rjina.vercel.app/mcp)
+
 This project provides an **unofficial** wrapper for the [Jina Reader API](https://jina.ai/reader/) using the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). It allows Language Models (LLMs) and other MCP-compatible clients to easily fetch, read, and process content from any URL in an LLM-friendly format, leveraging Jina Reader's capabilities.
 
 ## Key Features
