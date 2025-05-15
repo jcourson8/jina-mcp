@@ -5,6 +5,6 @@
     }
   },
   "rewrites": [
-    { "source": "/mcp", "destination": "/api/mcp" }
+    { "source": "/mcp", "destination": "/api/mcp/server" }
   ]
 }
