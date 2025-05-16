@@ -99,6 +99,103 @@ const handler = createMcpHandler((server) => {
       }
     }
   );
+
+  server.tool(
+    "search",
+    "Performs a web search using Jina Reader API (s.jina.ai). Supports various search parameters including type (web/images/news), provider (Google/Bing), language, location, and search operators.",
+    {
+      q: z.string().describe("The search query string."),
+      apiKey: z.string().describe("Jina Reader API key for authentication."),
+      type: z.enum(["web", "images", "news"]).optional().default("web").describe("Type of search results to return."),
+      provider: z.enum(["google", "bing"]).optional().describe("Search provider to use."),
+      count: z.number().int().min(0).max(20).optional().describe("Number of results to return (max 20)."),
+      num: z.number().int().min(0).max(20).optional().describe("Alternative to count - number of results to return (max 20)."),
+      gl: z.string().optional().describe("Geographic location - two-letter country code."),
+      hl: z.string().optional().describe("Interface language code (e.g. 'en' for English)."),
+      location: z.string().optional().describe("Location string for local search results."),
+      page: z.number().int().optional().describe("Page number for paginated results."),
+      fallback: z.boolean().optional().default(true).describe("Whether to use fallback options if primary search fails."),
+      nfpr: z.boolean().optional().describe("No Foreign Page Results - only show pages in specified language."),
+      ext: z.array(z.string()).optional().describe("File extensions to filter results by."),
+      filetype: z.array(z.string()).optional().describe("File types to filter results by."),
+      intitle: z.array(z.string()).optional().describe("Terms that must appear in the page title."),
+      site: z.array(z.string()).optional().describe("Limit results to specific websites."),
+      loc: z.array(z.string()).optional().describe("Language codes to filter results by."),
+      outputFormat: z.enum(["json", "text"]).optional().describe("Response format (application/json or text/plain)."),
+      noCache: z.boolean().optional().describe("Bypass cache for fresh results."),
+      cacheTolerance: z.number().int().optional().describe("Cache tolerance in seconds."),
+    },
+    async ({
+      q,
+      apiKey,
+      type = "web",
+      provider,
+      count,
+      num,
+      gl,
+      hl,
+      location,
+      page,
+      fallback = true,
+      nfpr,
+      ext,
+      filetype,
+      intitle,
+      site,
+      loc,
+      outputFormat,
+      noCache,
+      cacheTolerance,
+    }) => {
+      try {
+        const requestHeaders: HeadersInit = {};
+        if (apiKey) requestHeaders['Authorization'] = `Bearer ${apiKey}`;
+        if (outputFormat === 'json') requestHeaders['Accept'] = 'application/json';
+        if (noCache) requestHeaders['X-No-Cache'] = 'true';
+        if (typeof cacheTolerance === 'number') requestHeaders['X-Cache-Tolerance'] = String(cacheTolerance);
+
+        const searchParams = new URLSearchParams();
+        searchParams.append('q', q);
+        if (type) searchParams.append('type', type);
+        if (provider) searchParams.append('provider', provider);
+        if (count) searchParams.append('count', String(count));
+        if (num) searchParams.append('num', String(num));
+        if (gl) searchParams.append('gl', gl);
+        if (hl) searchParams.append('hl', hl);
+        if (location) searchParams.append('location', location);
+        if (page) searchParams.append('page', String(page));
+        if (fallback !== undefined) searchParams.append('fallback', String(fallback));
+        if (nfpr !== undefined) searchParams.append('nfpr', String(nfpr));
+        if (ext?.length) ext.forEach(e => searchParams.append('ext', e));
+        if (filetype?.length) filetype.forEach(f => searchParams.append('filetype', f));
+        if (intitle?.length) intitle.forEach(t => searchParams.append('intitle', t));
+        if (site?.length) site.forEach(s => searchParams.append('site', s));
+        if (loc?.length) loc.forEach(l => searchParams.append('loc', l));
+
+        const response = await fetch(`https://s.jina.ai/search?${searchParams.toString()}`, {
+          headers: requestHeaders,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          return {
+            content: [{ type: "text", text: `Error performing search: ${response.status} ${response.statusText}. ${errorText}` }],
+            isError: true,
+          };
+        }
+
+        const responseText = await response.text();
+        return {
+          content: [{ type: "text", text: responseText }],
+        };
+      } catch (error: any) {
+        return {
+          content: [{ type: "text", text: `Network error during search: ${error.message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
 });
 
 export { handler as GET, handler as POST, handler as DELETE };

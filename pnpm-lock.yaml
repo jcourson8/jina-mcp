@@ -5,6 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 dependencies:
+  '@modelcontextprotocol/sdk':
+    specifier: ^1.11.3
+    version: 1.11.3
   '@vercel/mcp-adapter':
     specifier: ^0.2.1
     version: 0.2.4(@modelcontextprotocol/sdk@1.11.3)(next@15.3.2)(redis@4.7.1)
