@@ -196,6 +196,148 @@ const handler = createMcpHandler((server) => {
       }
     }
   );
+
+  // Google Flights SerpApi Tool
+  const googleFlightsRawShape = {
+    api_key: z.string().describe("Your SerpApi private key. This is a required parameter."),
+    departure_id: z.string().optional().describe("Departure airport code(s) or location kgmid(s) (e.g., 'AUS', 'CDG,ORY', '/m/0vzm'). Separate multiple values with a comma."),
+    arrival_id: z.string().optional().describe("Arrival airport code(s) or location kgmid(s) (e.g., 'LHR', 'CDG,ORY', '/m/04jpl'). Separate multiple values with a comma."),
+    gl: z.string().optional().describe("Defines the country to use for the Google Flights search (e.g., 'us', 'uk'). See SerpApi Google countries page for a full list."),
+    hl: z.string().optional().describe("Defines the language to use for the Google Flights search (e.g., 'en', 'es'). See SerpApi Google languages page for a full list."),
+    currency: z.string().optional().describe("Defines the currency for returned prices (e.g., 'USD', 'EUR'). Defaults to 'USD'. See SerpApi Google Travel Currencies page."),
+    flight_type: z.enum(["1", "2", "3"]).optional()
+      .describe("Type of flights: '1' for Round trip (default), '2' for One way, '3' for Multi-city. If '3', use multi_city_json."),
+    outbound_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional()
+      .describe("Outbound date in YYYY-MM-DD format (e.g., '2025-05-19')."),
+    return_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional()
+      .describe("Return date in YYYY-MM-DD format (e.g., '2025-05-25'). Required if flight_type is '1' (Round trip)."),
+    travel_class: z.enum(["1", "2", "3", "4"]).optional()
+      .describe("Travel class: '1' for Economy (default), '2' for Premium economy, '3' for Business, '4' for First."),
+    multi_city_json: z.string().optional()
+      .describe("JSON string for multi-city flights. Example: '[{\"departure_id\":\"CDG\",\"arrival_id\":\"NRT\",\"date\":\"2025-05-25\"},...]'. Required if flight_type is '3'."),
+    show_hidden: z.boolean().optional().describe("Set to true to include hidden flight results. Defaults to false."),
+    deep_search: z.boolean().optional().describe("Set to true for deep search (more precise results, longer response time). Defaults to false."),
+    adults: z.number().int().min(0).optional().describe("Number of adults. Defaults to 1."),
+    children: z.number().int().min(0).optional().describe("Number of children. Defaults to 0."),
+    infants_in_seat: z.number().int().min(0).optional().describe("Number of infants in seat. Defaults to 0."),
+    infants_on_lap: z.number().int().min(0).optional().describe("Number of infants on lap. Defaults to 0."),
+    sort_by: z.enum(["1", "2", "3", "4", "5", "6"]).optional()
+      .describe("Sorting order: '1' for Top flights (default), '2' for Price, '3' for Departure time, '4' for Arrival time, '5' for Duration, '6' for Emissions."),
+    stops: z.enum(["0", "1", "2", "3"]).optional()
+      .describe("Number of stops: '0' for Any stops (default), '1' for Nonstop only, '2' for 1 stop or fewer, '3' for 2 stops or fewer."),
+    exclude_airlines: z.string().optional().describe("Comma-separated airline codes/alliances to exclude (e.g., 'UA,DL' or 'STAR_ALLIANCE'). Cannot be used with include_airlines."),
+    include_airlines: z.string().optional().describe("Comma-separated airline codes/alliances to include (e.g., 'UA,DL' or 'STAR_ALLIANCE'). Cannot be used with exclude_airlines."),
+    bags: z.number().int().min(0).optional().describe("Number of carry-on bags. Defaults to 0."),
+    max_price: z.number().int().min(0).optional().describe("Maximum ticket price. Defaults to unlimited."),
+    outbound_times: z.string().optional().describe("Outbound times range (e.g., '4,18' for 4am-7pm departure, or '4,18,3,19' for 4am-7pm departure and 3am-8pm arrival)."),
+    return_times: z.string().optional().describe("Return times range. Format similar to outbound_times. Used if flight_type is '1'."),
+    emissions: z.enum(["1"]).optional().describe("Emission level: '1' for Less emissions only."),
+    layover_duration: z.string().optional().describe("Layover duration in minutes, comma-separated min,max (e.g., '90,330' for 1.5-5.5 hours)."),
+    exclude_conns: z.string().optional().describe("Comma-separated connecting airport codes to exclude (e.g., 'CDG,AUS')."),
+    max_duration: z.number().int().min(0).optional().describe("Maximum flight duration in minutes (e.g., 1500 for 25 hours)."),
+    departure_token: z.string().optional().describe("Token for selecting a flight and getting returning flights (Round trip) or next leg flights (Multi-city). Cannot be used with booking_token."),
+    booking_token: z.string().optional().describe("Token for getting booking options for selected flights. Cannot be used with departure_token. If used, date and Advanced Filters parameters might be ignored by SerpApi."),
+    no_cache: z.boolean().optional().describe("Force SerpApi to fetch fresh results, ignoring cache. Cannot be used with async_search. Defaults to false."),
+    async_search: z.boolean().optional().describe("Submit search to SerpApi asynchronously. Retrieve results later via Searches Archive API. Cannot be used with no_cache. Defaults to false."),
+    zero_trace: z.boolean().optional().describe("Enterprise only. If true, SerpApi skips storing search parameters, files, and metadata. Defaults to false."),
+  };
+
+  const googleFlightsFullSchema = z.object(googleFlightsRawShape)
+    .describe("Searches for flight information using the SerpApi Google Flights API. Allows detailed querying of flights, including departure/arrival locations, dates, passenger numbers, and advanced filters. Requires a SerpApi API key.")
+    .refine(data => !(data.exclude_airlines && data.include_airlines), {
+      message: "exclude_airlines and include_airlines cannot be used together.",
+      path: ["exclude_airlines"], 
+    }).refine(data => !(data.departure_token && data.booking_token), {
+      message: "departure_token and booking_token cannot be used together.",
+      path: ["departure_token"],
+    }).refine(data => !(data.no_cache && data.async_search), {
+      message: "no_cache and async_search cannot be used together.",
+      path: ["no_cache"],
+    }).refine(data => {
+      if (data.flight_type === "1" && typeof data.return_date === 'undefined') {
+        return false;
+      }
+      return true;
+    }, {
+      message: "return_date is required when flight_type is '1' (Round trip).",
+      path: ["return_date"],
+    }).refine(data => {
+      if (data.flight_type === "3" && typeof data.multi_city_json === 'undefined') {
+        return false;
+      }
+      return true;
+    }, {
+      message: "multi_city_json is required when flight_type is '3' (Multi-city).",
+      path: ["multi_city_json"],
+    });
+
+  server.tool(
+    "searchGoogleFlights", 
+    googleFlightsRawShape,
+    async (params: z.infer<z.ZodObject<typeof googleFlightsRawShape>>) => {
+    let validatedParams;
+    try {
+      validatedParams = googleFlightsFullSchema.parse(params);
+    } catch (validationError: any) {
+      console.error("Input validation error for searchGoogleFlights:", validationError.errors);
+      return {
+        content: [{ type: "text", text: `Input validation error: ${validationError.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}` }],
+        isError: true,
+      };
+    }
+
+    const { api_key, flight_type, async_search, ...restParams } = validatedParams;
+    
+    const queryParams = new URLSearchParams({
+      engine: "google_flights",
+      api_key: api_key,
+    });
+
+    if (typeof flight_type !== 'undefined') {
+      queryParams.set("type", flight_type);
+    }
+    if (typeof async_search !== 'undefined') {
+      queryParams.set("async", async_search.toString());
+    }
+
+    for (const [key, valueWithMaybeUndefined] of Object.entries(restParams)) {
+      if (typeof valueWithMaybeUndefined !== 'undefined') {
+        const value = valueWithMaybeUndefined;
+        if (typeof value === 'boolean' || typeof value === 'number') {
+          queryParams.set(key, value.toString());
+        } else if (typeof value === 'string') { 
+          queryParams.set(key, value);
+        }
+      }
+    }
+
+    const serpApiUrl = `https://serpapi.com/search.json?${queryParams.toString()}`;
+
+    try {
+      // @ts-ignore
+      const response = await fetch(serpApiUrl);
+      if (!response.ok) {
+        // @ts-ignore
+        const errorData = await response.text();
+        console.error(`SerpApi Error (${response.status}): ${errorData}`);
+        return {
+          content: [{ type: "text", text: `Error fetching flight data from SerpApi: ${response.status} ${response.statusText}. Details: ${errorData}` }],
+          isError: true,
+        };
+      }
+      // @ts-ignore
+      const data = await response.json();
+      return {
+        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      };
+    } catch (error: any) {
+      console.error(`Network or other error calling SerpApi: ${error.message}`);
+      return {
+        content: [{ type: "text", text: `Failed to fetch flight data: ${error.message}` }],
+        isError: true,
+      };
+    }
+  });
 });
 
 export { handler as GET, handler as POST, handler as DELETE };
